@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from time import sleep
 
 from lolbot.bot import game, launcher
+from lolbot.bot.game import MAX_GAME_NUM
 from lolbot.system import mouse, window, cmd, OS
 from lolbot.common import accounts, config, logger
 from lolbot.lcu.league_client import LeagueClient, LCUError
@@ -66,6 +67,10 @@ class Bot:
                     log.info("Setting configs failed, using existing settings.")
                 self.leveling_loop(games)
                 cmd.run(cmd.CLOSE_ALL)
+                # Stop if max game limit reached
+                if games.value >= MAX_GAME_NUM:
+                    log.info("Bot Successfully Terminated")
+                    return
                 self.bot_errors = 0
                 self.phase_errors = 0
             except BotError as be:
@@ -90,7 +95,7 @@ class Bot:
 
     def leveling_loop(self, games: mp.Value) -> None:
         """Loop that takes action based on the phase of the League Client, continuously starts games."""
-        while not self.account_leveled():
+        while not self.account_leveled() and games.value < MAX_GAME_NUM:
             match self.get_phase():
                 case "None" | "Lobby":
                     self.start_matchmaking()
@@ -111,8 +116,13 @@ class Bot:
                 case "EndOfGame":
                     self.end_of_game()
                     games.value += 1
+                    log.info(f"Games completed: {games.value}/{MAX_GAME_NUM}")
                 case _:
                     raise BotError("Unknown phase. {}".format(self.phase))
+
+        # Log reason for stopping
+        if games.value >= MAX_GAME_NUM:
+            log.info(f"Maximum game limit reached ({MAX_GAME_NUM} games). Stopping bot.")
 
     def get_phase(self) -> str:
         """Requests the League Client phase."""

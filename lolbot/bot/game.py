@@ -13,6 +13,7 @@ from lolbot.system import mouse, keys, window, cmd
 log = logging.getLogger(__name__)
 
 # Game Times
+MAX_GAME_NUM = 1
 LOADING_SCREEN_TIME = 3
 MINION_CLASH_TIME = 50
 FIRST_TOWER_TIME = 1200
@@ -132,7 +133,7 @@ def game_start(game_server: GameServer) -> None:
     log.info("Playing Game")
 
 
-def safe_sleep(duration: int, game_server: GameServer, retreat: tuple, panic_threshold: float = 0.5, interval: float = 0.5) -> bool:
+def safe_sleep(duration: int, game_server: GameServer, retreat: tuple, panic_threshold: float = 0.5, interval: float = 0.25) -> bool:
     """
     Sleeps in small intervals while checking health.
     Triggers panic mode (flash, ult, retreat, ghost) if health drops below threshold.
@@ -147,6 +148,9 @@ def safe_sleep(duration: int, game_server: GameServer, retreat: tuple, panic_thr
             keypress('d')  # barrier
             keypress('r')  # ult
             right_click(retreat)
+            sleep(5)
+            keypress('b')
+            sleep(10)
             return False
         sleep(interval)
         elapsed += interval
@@ -166,36 +170,28 @@ def play(game_server: GameServer, attack_position: tuple, retreat: tuple, time_t
 
     # Main attack move loop
     for _ in range(8):
-        if game_server.get_summoner_health() > .7:
+        if game_server.get_summoner_health() < .7:
             continue
-        if game_server.summoner_is_dead():
-            return
+        if game_server.summoner_is_dead(): return
 
         attack_click(attack_position)
         keypress('w')
-        if not safe_sleep(2.5, game_server, retreat):
-            return
+        if not safe_sleep(2.5, game_server, retreat): return
         keypress('e')
-        if not safe_sleep(2.5, game_server, retreat):
-            return
+        if not safe_sleep(2.5, game_server, retreat): return
         keypress('w')
-        if not safe_sleep(1, game_server, retreat):
-            return
+        if not safe_sleep(1, game_server, retreat): return
         right_click(retreat)
-        if not safe_sleep(2, game_server, retreat):
-            return
+        if not safe_sleep(2, game_server, retreat): return
         
     right_click(retreat)
-    if not safe_sleep(4, game_server, retreat):
-        return
-    if game_server.summoner_is_dead():
-        return
+    if not safe_sleep(4, game_server, retreat): return
+    if game_server.summoner_is_dead(): return
     sleep(1)
     right_click(MINI_MAP_UNDER_TURRET)
-    if not safe_sleep(4, game_server, retreat):
-        return
+    if not safe_sleep(4, game_server, retreat): return
     keypress('b')
-    sleep(10)  # backing is safe, no need to check
+    sleep(10)
 
 
 def shop() -> None:
@@ -209,10 +205,11 @@ def shop() -> None:
 
 def upgrade_abilities() -> None:
     window.check_window_exists(window.GAME_WINDOW)
-    # Priority: E -> W -> R -> Q (press each 4 times to max before moving on)
-    for upgrade in ['ctrl+e', 'ctrl+w', 'ctrl+r', 'ctrl+q']:
+    # Priority: R -> E -> W -> Q (press each 4 times to max before moving on)
+    for upgrade in ['ctrl+r', 'ctrl+e', 'ctrl+w', 'ctrl+q']:
         for _ in range(4):
             keys.press_and_release(upgrade)
+            sleep(0.25)
 
 
 def left_click(ratio: tuple) -> None:
