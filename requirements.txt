@@ -3,6 +3,7 @@ pyautogui
 requests
 urllib3
 dearpygui
+pynput
 psutil; sys_platform == "win32"
 mouse; sys_platform == "win32"
 pywin32; sys_platform == "win32"

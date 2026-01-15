@@ -3,14 +3,16 @@ View tab that sets configurations for the bot.
 """
 
 import os
-from tkinter import Tk
-from tkinter.filedialog import askdirectory
 
 import dearpygui.dearpygui as dpg
 
 import lolbot.common.config as config
 from lolbot.common.config import FONT_PATH
 from lolbot.system import OS
+
+if OS == "Windows":
+    from tkinter import Tk
+    from tkinter.filedialog import askdirectory
 
 TAG_LEAGUE_PATH = "LeaguePath"
 TAG_LOBBY = "Lobby"

@@ -14,8 +14,8 @@ log = logging.getLogger(__name__)
 
 # Game Times
 LOADING_SCREEN_TIME = 3
-MINION_CLASH_TIME = 85
-FIRST_TOWER_TIME = 1500
+MINION_CLASH_TIME = 50
+FIRST_TOWER_TIME = 1200
 MAX_GAME_TIME = 3000
 
 # Click coordinates to move/aim
@@ -122,12 +122,35 @@ def game_start(game_server: GameServer) -> None:
     shop()
     keypress('y')  # lock screen
     upgrade_abilities()
-
+    send_chat_message('sry if bad')
+    sleep(3)
+    send_chat_message('im new')
     # Sit under turret till minions clash mid lane
     while game_server.get_game_time() < MINION_CLASH_TIME:
         right_click(MINI_MAP_UNDER_TURRET)  # to prevent afk warning popup
         left_click(AFK_OK_BUTTON)
     log.info("Playing Game")
+
+
+def safe_sleep(duration: int, game_server: GameServer, retreat: tuple, panic_threshold: float = 0.5, interval: float = 0.5) -> bool:
+    """
+    Sleeps in small intervals while checking health.
+    Triggers panic mode (flash, ult, retreat, ghost) if health drops below threshold.
+    Returns True if completed normally, False if panic mode was triggered.
+    """
+    elapsed = 0
+    while elapsed < duration:
+        if game_server.summoner_is_dead():
+            return False
+        if game_server.get_summoner_health() < panic_threshold:
+            keypress('f')  # heal
+            keypress('d')  # barrier
+            keypress('r')  # ult
+            right_click(retreat)
+            return False
+        sleep(interval)
+        elapsed += interval
+    return True
 
 
 def play(game_server: GameServer, attack_position: tuple, retreat: tuple, time_to_lane: int) -> None:
@@ -138,40 +161,47 @@ def play(game_server: GameServer, attack_position: tuple, retreat: tuple, time_t
 
     # Walk to lane
     attack_click(attack_position)
-    keypress('d')  # ghost
-    sleep(time_to_lane)
+    if not safe_sleep(time_to_lane, game_server, retreat):
+        return
 
-    # Main attack move loop. This sequence attacks and then de-aggros to prevent them from dying 50 times.
-    for i in range(8):
-        if game_server.get_summoner_health() < .7:
-            keypress('f')
-            right_click(retreat)
-            sleep(4)
-            break
+    # Main attack move loop
+    for _ in range(8):
+        if game_server.get_summoner_health() > .7:
+            continue
         if game_server.summoner_is_dead():
             return
-        attack_click(attack_position)
-        sleep(5)
-        right_click(retreat)
-        sleep(3)
 
+        attack_click(attack_position)
+        keypress('w')
+        if not safe_sleep(2.5, game_server, retreat):
+            return
+        keypress('e')
+        if not safe_sleep(2.5, game_server, retreat):
+            return
+        keypress('w')
+        if not safe_sleep(1, game_server, retreat):
+            return
+        right_click(retreat)
+        if not safe_sleep(2, game_server, retreat):
+            return
+        
+    right_click(retreat)
+    if not safe_sleep(4, game_server, retreat):
+        return
     if game_server.summoner_is_dead():
         return
-    # Ult and back
-    keypress('f')
-    attack_click(ULT_DIRECTION)
-    keypress('r')
     sleep(1)
     right_click(MINI_MAP_UNDER_TURRET)
-    sleep(4)
+    if not safe_sleep(4, game_server, retreat):
+        return
     keypress('b')
-    sleep(10)
+    sleep(10)  # backing is safe, no need to check
 
 
 def shop() -> None:
     """Opens the shop and attempts to purchase items via default shop hotkeys"""
     keypress('p')  # open shop
-    left_click(random.choice(SHOP_ITEM_BUTTONS))
+    left_click(SHOP_ITEM_BUTTONS[1])
     left_click(SHOP_PURCHASE_ITEM_BUTTON)
     keypress('esc')
     left_click(SYSTEM_MENU_X_BUTTON)
@@ -179,11 +209,10 @@ def shop() -> None:
 
 def upgrade_abilities() -> None:
     window.check_window_exists(window.GAME_WINDOW)
-    keys.press_and_release('ctrl+r')
-    upgrades = ['ctrl+q', 'ctrl+w', 'ctrl+e']
-    random.shuffle(upgrades)
-    for upgrade in upgrades:
-        keys.press_and_release(upgrade)
+    # Priority: E -> W -> R -> Q (press each 4 times to max before moving on)
+    for upgrade in ['ctrl+e', 'ctrl+w', 'ctrl+r', 'ctrl+q']:
+        for _ in range(4):
+            keys.press_and_release(upgrade)
 
 
 def left_click(ratio: tuple) -> None:
@@ -216,3 +245,14 @@ def keypress(key: str) -> None:
     window.check_window_exists(window.GAME_WINDOW)
     keys.press_and_release(key)
     sleep(1)
+
+
+def send_chat_message(message: str) -> None:
+    """Types a message in the in-game chat"""
+    window.check_window_exists(window.GAME_WINDOW)
+    keys.press_and_release('enter')
+    sleep(0.2)
+    keys.write(message)
+    sleep(0.1)
+    keys.press_and_release('enter')
+    sleep(0.5)

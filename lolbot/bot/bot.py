@@ -60,7 +60,10 @@ class Bot:
                 self.account = accounts.get_account(self.max_level)
                 self.launcher.launch_league(self.account["username"], self.account["password"])
                 self.wait_for_patching()
-                self.set_game_config()
+                try:
+                    self.set_game_config()
+                except:
+                    log.info("Setting configs failed, using existing settings.")
                 self.leveling_loop(games)
                 cmd.run(cmd.CLOSE_ALL)
                 self.bot_errors = 0
@@ -205,7 +208,11 @@ class Bot:
                 for action in data["actions"][0]:
                     if action["actorCellId"] == data["localPlayerCellId"]:
                         if action["championId"] == 0:  # No champ hovered. Hover a champion.
-                            champ = random.choice(champ_list)
+                            preferred_champ = 32  # Amumu
+                            if preferred_champ in champ_list:
+                                champ = preferred_champ
+                            else:
+                                champ = random.choice(champ_list)
                             self.api.hover_champion(action["id"], champ)
                         elif not action["completed"]:  # Champ is hovered but not locked in.
                             self.api.lock_in_champion(action["id"], action["championId"])
@@ -370,6 +377,8 @@ class Bot:
                             setting['value'] = str(1.0000)
                         if setting.get('name') == 'ShopScale':
                             setting['value'] = str(0.4444)
+                        if setting.get('name') == 'Movement Mode':
+                            setting['value'] = str(0)
                 if section.get('name') == "General":
                     for setting in section.get('settings', []):
                         if setting.get('name') == 'EnableTargetedAttackMove':
